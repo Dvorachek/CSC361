@@ -22,12 +22,12 @@ class smart_web_client(object):
 
     def send_request(self, request):
     
-        print request
+        # print request
         self.ss.sendall(request)
         
         response = self.ss.recv(_BUFF_SIZE)
         r = response
-        print response
+        # print response
 
         while response:
             response = self.ss.recv(_BUFF_SIZE)
@@ -36,7 +36,7 @@ class smart_web_client(object):
         
 def main():
     host = "https://www.uvic.ca/"
-    host1 = 'github.com'
+    host1 = 'www.github.com'
     host2 = 'www.uvic.ca'
     # h = host.split('/')[2]
     
@@ -44,12 +44,12 @@ def main():
     port = 443
     # request = b"GET / HTTP/1.0\nHost: {}\r\n\r\n".format(h)
 
-    r1 = "GET / HTTP/1.0\r\nHost: github.com\r\nConnection: close\r\n\r\n"
+    r1 = "HEAD / HTTP/1.0\r\nHost: www.github.com\r\nConnection: close\r\n\r\n"
     
-    r2 = "GET / HTTP/1.0\r\nHost: www.uvic.ca\r\nConnection: close\r\n\r\n"
+    r2 = "HEAD / HTTP/1.0\r\nHost: www.uvic.ca\r\nConnection: close\r\n\r\n"
 
     # try:
-    client = smart_web_client(host2, port)
+    client = smart_web_client(host1, port)
     # except:
         # print "failed creating socket"
     
@@ -57,11 +57,13 @@ def main():
     # client.connect()
     # except:
         # print "failed connecting to {} on {}".format(host, port)
-    print 'woop'
     # try:
-    response = client.send_request(r2)
-    # print response
-    print 'test'
+    response = client.send_request(r1)
+    print response
+    response = response.split(' ')[1]
+    print response
+    
+    # print 'test'
     # except Exception, e:
        # print str(e)
     
