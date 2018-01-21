@@ -61,7 +61,7 @@ class smart_web_client(object):
             response = self.s.recv(_BUFF_SIZE)
             r += response
             
-        return r
+        return r.decode()
             
     def send_request_https(self, request):
         self.ss.sendall(request)
@@ -72,7 +72,7 @@ class smart_web_client(object):
             response = self.ss.recv(_BUFF_SIZE)
             r += response
             
-        return r
+        return r.decode()
         
     def send_request(self):
         request = str.encode("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(self.host))
@@ -129,7 +129,7 @@ def redirection(location):
     sock.sendall(request)
     response = sock.recv(100000)
     sock.close
-    return response
+    return response.decode()
 
 def response_ok(response):
     global https
