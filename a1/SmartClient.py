@@ -75,7 +75,7 @@ class smart_web_client(object):
         return r
         
     def send_request(self):
-        request = b"HEAD / HTTP/1.1\r\nHost: " + self.host + b"\r\nConnection: close\r\n\r\n"
+        request = str.encode("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(self.host))
         
         response = []
         response.append(self.send_request_http(request))
@@ -124,7 +124,7 @@ def redirection(location):
     else:
         sock.connect((location, 80))
         
-    request = b"HEAD / HTTP/1.1\r\nHost: " + location + b"\r\nConnection: close\r\n\r\n"
+    request = str.encode("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(location))
     sock.sendall(request)
     response = sock.recv(100000)
     sock.close
