@@ -105,6 +105,7 @@ def locate(response):
 def redirection(location):
     global https
     location = location.strip()
+    
     if location[:8] == 'https://':
         location = location[8:]
         https = 'yes'
@@ -237,7 +238,10 @@ def main():
 
     host = sys.argv[1]
     
-    check_http2(host)
+    try:
+        check_http2(host)
+    except:
+        print('http2 not supported')
     
     client = smart_web_client(host)
 
