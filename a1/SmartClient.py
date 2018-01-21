@@ -28,12 +28,12 @@ class smart_web_client(object):
         try:
             self.connect()
         except:
-            print 'http failed'
+            print('http failed')
             
         try:
             self.connect_s()
         except:
-            print 'https failed'
+            print('https failed')
         
     def connect(self):
         self.s.connect((self.host, self.port))
@@ -45,12 +45,12 @@ class smart_web_client(object):
         try:
             self.s.close
         except:
-            print 'no http connection to disconnect'
+            print('no http connection to disconnect')
         
         try:
             self.ss.close
         except:
-            print 'no https connection to disconnect'
+            print('no https connection to disconnect')
 
     def send_request_http(self, request):
         self.s.sendall(request)
@@ -155,29 +155,23 @@ def response_ok(response):
         return 5
         
 def parse_and_format(response, host):
-    output = {'https': '',
-              'http': '',
-              'cookies': []}
     global http_version, https
-              
-    print "website: {}".format(host)
-    print "1. Support of HTTPS: {}".format(https)
-    
-    print response
-    
+
     response = response.split('\n')
 
+    cookies = []
     for item in response:
         if 'HTTP' in item and not http_version:
             http_version = item.split(' ')[0]
         if 'Set-Cookie:' in item:
-            output['cookies'].append(item[11:])
+            cookies.append(item[11:])
 
-    print "2. The newest HTTP versions that the web server supports: {}".format(http_version)
-    print "3. List of Cookies:"
+    print("website: {}".format(host))
+    print("1. Support of HTTPS: {}".format(https))
+    print("2. The newest HTTP versions that the web server supports: {}".format(http_version))
+    print("3. List of Cookies:")
 
-    cookies = []
-    for item in output['cookies']:
+    for item in cookies:
         name = '-'
         key = '-'
         domain = host
@@ -187,7 +181,7 @@ def parse_and_format(response, host):
             if 'domain' in segment:
                 domain = segment.split('=')[1]
 
-        print "name: {}, key: {}, domain name: {}".format(name, key, domain)
+        print("name: {}, key: {}, domain name: {}".format(name, key, domain))
 
 '''
 The next three functions were taken from: https://python-hyper.org/projects/h2/en/stable/negotiating-http2.html
@@ -222,7 +216,7 @@ def negotiate_tls(tcp_conn, context, host):
         negotiated_protocol = tls_conn.selected_npn_protocol()
 
     if negotiated_protocol != "h2":
-        print "Didn't negotiate HTTP/2!"
+        print("Didn't negotiate HTTP/2!")
         # raise RuntimeError("Didn't negotiate HTTP/2!")
     else:
         http_version = 'HTTP/2'
@@ -237,7 +231,7 @@ def check_http2(host):
 
 def main():
     if len(sys.argv) < 2:
-        print "Invalid program usage, please specify a web server"
+        print("Invalid program usage, please specify a web server")
         exit(0)
 
     host = sys.argv[1]
