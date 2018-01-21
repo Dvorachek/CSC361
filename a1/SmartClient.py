@@ -75,7 +75,7 @@ class smart_web_client(object):
         return r
         
     def send_request(self):
-        request = b"HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(self.host)
+        request = b"HEAD / HTTP/1.1\r\nHost: " + self.host + b"\r\nConnection: close\r\n\r\n"
         
         response = []
         response.append(self.send_request_http(request))
@@ -95,7 +95,7 @@ def locate(response):
     response = response.split('\n')
     location = ''
     for line in response:
-        if line[:10] == b'Location: ':
+        if line[:10] == 'Location: ':
             location = line[10:]
             break
     
@@ -104,15 +104,15 @@ def locate(response):
 def redirection(location):
     global https
     location = location.strip()
-    if location[:8] == b'https://':
+    if location[:8] == 'https://':
         location = location[8:]
         https = 'yes'
 
-    if location[:7] == b'http://':
+    if location[:7] == 'http://':
         location = location[7:]
         https = 'no'
     
-    if location[-1] == b'/':
+    if location[-1] == '/':
         location = location[:-1]
         
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -124,7 +124,7 @@ def redirection(location):
     else:
         sock.connect((location, 80))
         
-    request = b"HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(location)
+    request = b"HEAD / HTTP/1.1\r\nHost: " + location + b"\r\nConnection: close\r\n\r\n"
     sock.sendall(request)
     response = sock.recv(100000)
     sock.close
@@ -133,25 +133,25 @@ def redirection(location):
 def response_ok(response):
     global https
     
-    if response_code(response[1]) == b'200':
+    if response_code(response[1]) == '200':
         https = 'yes'
         return 1
-    elif response_code(response[0]) == b'200':
+    elif response_code(response[0]) == '200':
         https = 'no'
         return 0
-    elif response_code(response[1]) in b'301 302':
+    elif response_code(response[1]) in '301 302':
         response.append(redirection(locate(response[1])))
         return 2
-    elif response_code(response[0]) in b'301 302':
+    elif response_code(response[0]) in '301 302':
         response.append(redirection(locate(response[0])))
         return 2
-    elif response_code(response[1]) in b'404':
+    elif response_code(response[1]) in '404':
         return 4
-    elif response_code(response[0]) in b'404':
+    elif response_code(response[0]) in '404':
         return 4
-    elif response_code(response[1]) in b'505':
+    elif response_code(response[1]) in '505':
         return 5
-    elif response_code(response[0]) in b'505':
+    elif response_code(response[0]) in '505':
         return 5
         
 def parse_and_format(response, host):
