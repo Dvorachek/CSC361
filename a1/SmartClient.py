@@ -1,25 +1,28 @@
 import socket
 import ssl
 import sys
+import h2.connection
 import re
 
 
 _BUFF_SIZE = 10000
-# output = {'https': '',
-          # 'http': '',
-          # 'cookies': []}
+http_version = ''
+https = ''
 
 
 class smart_web_client(object):
 
-    def __init__(self, host, port, secure_port):
+    def __init__(self, host):
         self.host = host
-        self.port = port
-        self.secure_port = secure_port
+        self.port = 80
+        self.secure_port = 443
+        
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        
         self.s.settimeout(10)
         self.ss.settimeout(10)
+        
         self.__set_https()
         
         try:
@@ -71,6 +74,16 @@ class smart_web_client(object):
             
         return r
         
+    def send_request(self):
+        request = "HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(self.host)
+        
+        response = []
+        response.append(self.send_request_http(request))
+
+        i = response_ok(response)
+
+        return response[i]
+        
     def __set_https(self):
         self.ss = ssl.wrap_socket(self.ss, keyfile=None, certfile=None, server_side=False, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_SSLv23)
 
@@ -78,25 +91,74 @@ def response_code(response):
     response = response.split(' ')
     return response[1]
 
-def location(response):
+def locate(response):
     response = response.split('\n')
-    response = response[1].split(' ')[1]
+    location = ''
+    for line in response:
+        if line[:10] == 'Location: ':
+            location = line[10:]
+            break
+    
+    return location
+
+def redirection(location):
+    global https
+    location = location.strip()
+    if location[:8] == 'https://':
+        location = location[8:]
+        https = 'yes'
+
+    if location[:7] == 'http://':
+        location = location[7:]
+        https = 'no'
+    
+    if location[-1] == '/':
+        location = location[:-1]
+        
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(10)
+    
+    if https == 'yes':
+        sock.connect((location, 443))
+        sock = ssl.wrap_socket(sock, keyfile=None, certfile=None, server_side=False, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_SSLv23)
+    else:
+        sock.connect((location, 80))
+        
+    request = "HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(location)
+    sock.sendall(request)
+    response = sock.recv(100000)
+    sock.close
     return response
 
 def response_ok(response):
+    global https
+    
     if response_code(response[1]) == '200':
+        https = 'yes'
         return 1
     elif response_code(response[0]) == '200':
+        https = 'no'
         return 0
-    elif response_code(response[0]) in '300 301 302' or response_code(response[1]) in '300 301 302':
+    elif response_code(response[1]) in '301 302':
+        response.append(redirection(locate(response[1])))
         return 2
-    else:
-        return -1
+    elif response_code(response[0]) in '301 302':
+        response.append(redirection(locate(response[0])))
+        return 2
+    elif response_code(response[1]) in '404':
+        return 4
+    elif response_code(response[0]) in '404':
+        return 4
+    elif response_code(response[1]) in '505':
+        return 5
+    elif response_code(response[0]) in '505':
+        return 5
         
-def parse_and_format(response, host, https):
+def parse_and_format(response, host):
     output = {'https': '',
               'http': '',
               'cookies': []}
+    global http_version, https
               
     print "website: {}".format(host)
     print "1. Support of HTTPS: {}".format(https)
@@ -106,14 +168,12 @@ def parse_and_format(response, host, https):
     response = response.split('\n')
 
     for item in response:
-        if 'HTTP' in item:
-            output['http'] = item.split(' ')[0]
+        if 'HTTP' in item and not http_version:
+            http_version = item.split(' ')[0]
         if 'Set-Cookie:' in item:
-            if 'deleted' in item:
-                continue
             output['cookies'].append(item[11:])
-            
-    print "2. The newest HTTP versions that the web server supports: {}".format(output['http'])
+
+    print "2. The newest HTTP versions that the web server supports: {}".format(http_version)
     print "3. List of Cookies:"
 
     cookies = []
@@ -124,12 +184,55 @@ def parse_and_format(response, host, https):
         item = item.split(';')
         key = item[0].split('=')[0]
         for segment in item:
-            if '=' not in segment:
-                name = segment
             if 'domain' in segment:
                 domain = segment.split('=')[1]
 
         print "name: {}, key: {}, domain name: {}".format(name, key, domain)
+
+'''
+The next three functions were taken from: https://python-hyper.org/projects/h2/en/stable/negotiating-http2.html
+The purpose is to determine if the server supports HTTP2
+Comments have been removed to make functions smaller, but can be recovered by following the above link
+'''
+def establish_tcp_connection(host):
+    return socket.create_connection((host, 443))
+
+def get_http2_ssl_context():
+    ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+    ctx.options |= (
+        ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3 | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+    )
+    ctx.options |= ssl.OP_NO_COMPRESSION
+    ctx.set_ciphers("ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20")
+    ctx.set_alpn_protocols(["h2", "http/1.1"])
+
+    try:
+        ctx.set_npn_protocols(["h2", "http/1.1"])
+    except NotImplementedError:
+        pass
+
+    return ctx
+    
+def negotiate_tls(tcp_conn, context, host):
+    global http_version
+    tls_conn = context.wrap_socket(tcp_conn, server_hostname=host)
+
+    negotiated_protocol = tls_conn.selected_alpn_protocol()
+    if negotiated_protocol is None:
+        negotiated_protocol = tls_conn.selected_npn_protocol()
+
+    if negotiated_protocol != "h2":
+        print "Didn't negotiate HTTP/2!"
+        # raise RuntimeError("Didn't negotiate HTTP/2!")
+    else:
+        http_version = 'HTTP/2'
+
+    return tls_conn
+
+def check_http2(host):
+    context = get_http2_ssl_context()
+    connection = establish_tcp_connection(host)
+    tls_connection = negotiate_tls(connection, context, host)
 
 
 def main():
@@ -139,36 +242,13 @@ def main():
 
     host = sys.argv[1]
     
-    #TESTS
-    host1 = 'github.com'
-    host2 = 'www.uvic.ca'
-    request1 = "HEAD / HTTP/1.0\r\nHost: github.com\r\nConnection: close\r\n\r\n"
-    request2 = "HEAD / HTTP/1.0\r\nHost: www.uvic.ca\r\nConnection: close\r\n\r\n"
-
-    port = 80
-    secure_port = 443
-
-    request = "HEAD / HTTP/1.0\r\nHost: {}\r\nConnection: close\r\n\r\n".format(host)
-
-    client = smart_web_client(host, port, secure_port)
-
-    response = []
-    response.append(client.send_request_http(request))
-    response.append(client.send_request_https(request))
-
-    i = response_ok(response)
+    check_http2(host)
     
-    if i == 2:
-        print 'add redirection here'
-        # 
-        https = 'some sort of test here'
-    
-    if i == 1:
-        https = 'yes'
-    if i == 0:
-        https = 'no'
+    client = smart_web_client(host)
 
-    parse_and_format(response[i], host, https)
+    response = client.send_request()
+    
+    parse_and_format(response, host)
 
     client.disconnect()
 
