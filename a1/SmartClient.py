@@ -2,7 +2,6 @@ import socket
 import ssl
 import sys
 import h2.connection
-import re
 
 
 _BUFF_SIZE = 10000
@@ -11,7 +10,6 @@ https = ''
 
 
 class smart_web_client(object):
-
     def __init__(self, host):
         self.host = host
         self.port = 80
@@ -19,28 +17,19 @@ class smart_web_client(object):
         
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        
-        self.s.settimeout(10)
-        self.ss.settimeout(10)
-        
+
         self.__set_https()
+        self.__connect()
         
-        try:
-            self.connect()
-        except:
-            print('http failed')
-            
-        try:
-            self.connect_s()
-        except:
-            print('https failed')
+    def send_request(self):
+        request = str.encode("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(self.host))
         
-    def connect(self):
-        self.s.connect((self.host, self.port))
+        response = []
+        response.append(send_http_request(self.ss, request))
+        response.append(send_http_request(self.s, request))
         
-    def connect_s(self):
-        self.ss.connect((self.host, self.secure_port))
-        
+        return response[response_ok(response)]
+    
     def disconnect(self):
         try:
             self.s.close
@@ -51,43 +40,34 @@ class smart_web_client(object):
             self.ss.close
         except:
             print('no https connection to disconnect')
-
-    def send_request_http(self, request):
-        self.s.sendall(request)
-        response = self.s.recv(_BUFF_SIZE)
-        r = response
-
-        while response:
-            response = self.s.recv(_BUFF_SIZE)
-            r += response
-            
-        return r.decode()
-            
-    def send_request_https(self, request):
-        self.ss.sendall(request)
-        response = self.ss.recv(_BUFF_SIZE)
-        r = response
-
-        while response:
-            response = self.ss.recv(_BUFF_SIZE)
-            r += response
-            
-        return r.decode()
+    
+    def __connect(self):
+        self.s.settimeout(10)
+        self.ss.settimeout(10)
+        try:
+            self.s.connect((self.host, self.port))  # add exception
+        except:
+            print('http failed')
         
-    def send_request(self):
-        request = str.encode("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(self.host))
-        
-        response = []
-        response.append(self.send_request_https(request))
-        response.append(self.send_request_http(request))
-
-        i = response_ok(response)
-
-        return response[i]
-        
+        try:
+            self.ss.connect((self.host, self.secure_port))  # add exception
+        except:
+            print('https failed')
+    
     def __set_https(self):
         self.ss = ssl.wrap_socket(self.ss, keyfile=None, certfile=None, server_side=False, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_SSLv23)
 
+def send_http_request(sock, request):
+    sock.sendall(request)
+    response = sock.recv(_BUFF_SIZE)
+    r = response
+
+    while response:
+        response = sock.recv(_BUFF_SIZE)
+        r += response
+        
+    return r.decode()
+        
 def response_code(response):
     response = response.split(' ')
     return response[1]
@@ -104,7 +84,7 @@ def locate(response):
 
 def redirection(location):
     global https
-    location = location.strip()
+    location = location.strip().strip('/')
     
     if location[:8] == 'https://':
         location = location[8:]
@@ -113,22 +93,31 @@ def redirection(location):
     if location[:7] == 'http://':
         location = location[7:]
         https = 'no'
-    
-    if location[-1] == '/':
-        location = location[:-1]
         
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(10)
     
     if https == 'yes':
-        sock.connect((location, 443))
-        sock = ssl.wrap_socket(sock, keyfile=None, certfile=None, server_side=False, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_SSLv23)
+        try:
+            sock.connect((location, 443))
+            sock = ssl.wrap_socket(sock, keyfile=None, certfile=None, server_side=False, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_SSLv23)
+        except:
+            print("Failed to resolve host IP and connect to socket.\n" +
+                   "Redirection failed on https at {}. Likely 503 Error.".format(location)
+                 )
+            exit(1)
     else:
-        sock.connect((location, 80))
+        try:
+            sock.connect((location, 80))
+        except:
+            print("Failed to resolve host IP and connect to socket.\n" +
+                   "Redirection failed on http at {}. Likely 503 Error.".format(location)
+                 )
+            exit(1)
         
-    request = str.encode("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(location))
+    request = str.encode("HEAD / HTTP/1.0\r\nHost: {}\r\nConnection: close\r\n\r\n".format(location))
     sock.sendall(request)
-    response = sock.recv(100000)
+    response = sock.recv(_BUFF_SIZE)
     sock.close
     return response.decode()
 
@@ -147,14 +136,12 @@ def response_ok(response):
     elif response_code(response[1]) in '301 302':
         response.append(redirection(locate(response[0])))
         return 2
-    elif response_code(response[0]) in '404':
-        return 4
-    elif response_code(response[1]) in '404':
-        return 4
-    elif response_code(response[0]) in '505':
-        return 5
-    elif response_code(response[1]) in '505':
-        return 5
+    elif response_code(response[0]) in '404' or response_code(response[1]) in '404':
+        print("404 Error, client was able to communicate with server, but resource was not located")
+        exit(1)
+    elif response_code(response[0]) in '505' or response_code(response[1]) in '505':
+        print("505 Error, HTTP version not supported")
+        exit(1)
         
 def parse_and_format(response, host):
     global http_version, https
@@ -168,7 +155,7 @@ def parse_and_format(response, host):
         if 'Set-Cookie:' in item:
             cookies.append(item[11:])
 
-    print("website: {}".format(host))
+    print("\nwebsite: {}".format(host))
     print("1. Support of HTTPS: {}".format(https))
     print("2. The newest HTTP versions that the web server supports: {}".format(http_version))
     print("3. List of Cookies:")
@@ -185,11 +172,11 @@ def parse_and_format(response, host):
 
         print("name: {}, key: {}, domain name: {}".format(name, key, domain))
 
-'''
-The next three functions were taken from: https://python-hyper.org/projects/h2/en/stable/negotiating-http2.html
+'''############################################################################################################
+The next THREE functions were taken from: https://python-hyper.org/projects/h2/en/stable/negotiating-http2.html
 The purpose is to determine if the server supports HTTP2
 Comments have been removed to make functions smaller, but can be recovered by following the above link
-'''
+############################################################################################################'''
 def establish_tcp_connection(host):
     return socket.create_connection((host, 443))
 
@@ -219,7 +206,6 @@ def negotiate_tls(tcp_conn, context, host):
 
     if negotiated_protocol != "h2":
         print("Didn't negotiate HTTP/2!")
-        # raise RuntimeError("Didn't negotiate HTTP/2!")
     else:
         http_version = 'HTTP/2'
 
@@ -234,7 +220,7 @@ def check_http2(host):
 def main():
     if len(sys.argv) < 2:
         print("Invalid program usage, please specify a web server")
-        exit(0)
+        exit(1)
 
     host = sys.argv[1]
     
