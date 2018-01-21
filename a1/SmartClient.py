@@ -78,6 +78,7 @@ class smart_web_client(object):
         request = str.encode("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(self.host))
         
         response = []
+        response.append(self.send_request_https(request))
         response.append(self.send_request_http(request))
 
         i = response_ok(response)
@@ -133,25 +134,25 @@ def redirection(location):
 def response_ok(response):
     global https
     
-    if response_code(response[1]) == '200':
+    if response_code(response[0]) == '200':
         https = 'yes'
-        return 1
-    elif response_code(response[0]) == '200':
-        https = 'no'
         return 0
-    elif response_code(response[1]) in '301 302':
-        response.append(redirection(locate(response[1])))
-        return 2
+    elif response_code(response[1]) == '200':
+        https = 'no'
+        return 1
     elif response_code(response[0]) in '301 302':
         response.append(redirection(locate(response[0])))
         return 2
-    elif response_code(response[1]) in '404':
-        return 4
+    elif response_code(response[1]) in '301 302':
+        response.append(redirection(locate(response[0])))
+        return 2
     elif response_code(response[0]) in '404':
         return 4
-    elif response_code(response[1]) in '505':
-        return 5
+    elif response_code(response[1]) in '404':
+        return 4
     elif response_code(response[0]) in '505':
+        return 5
+    elif response_code(response[1]) in '505':
         return 5
         
 def parse_and_format(response, host):
