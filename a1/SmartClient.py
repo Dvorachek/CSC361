@@ -8,9 +8,9 @@ _BUFF_SIZE = 10000
 http_version = ''
 https = ''
 
-
+# A class for connecting of a specified host
 class smart_web_client(object):
-    def __init__(self, host):
+    def __init__(self, host):  # Constructor
         self.host = host
         self.port = 80
         self.secure_port = 443
@@ -18,19 +18,20 @@ class smart_web_client(object):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ss = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        self.__set_https()
-        self.__connect()
-        
+        self.__set_https()  # wrap the https socket
+        self.__connect()  # attempt connecting to both sockets
+    
     def send_request(self):
-        request = str.encode("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(self.host))
+        request = str.encode("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(self.host))  # encode string to byte array
         
-        response = []
+        response = []  # the responses are stored in a list
         response.append(send_http_request(self.ss, request))
         response.append(send_http_request(self.s, request))
         
+        # response_ok returns the index of the chosen reponse.. Python evaluates right to left
         return response[response_ok(response)]
     
-    def disconnect(self):
+    def disconnect(self):  # Fairly straight forward
         try:
             self.s.close
         except:
@@ -41,22 +42,25 @@ class smart_web_client(object):
         except:
             print('no https connection to disconnect')
     
+    # Sets timeouts and connects to both http and https
     def __connect(self):
         self.s.settimeout(10)
         self.ss.settimeout(10)
         try:
-            self.s.connect((self.host, self.port))  # add exception
+            self.s.connect((self.host, self.port))
         except:
             print('http failed')
         
         try:
-            self.ss.connect((self.host, self.secure_port))  # add exception
+            self.ss.connect((self.host, self.secure_port))
         except:
             print('https failed')
     
+    # SSL wraps the secure socket for https
     def __set_https(self):
         self.ss = ssl.wrap_socket(self.ss, keyfile=None, certfile=None, server_side=False, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_SSLv23)
 
+# Takes a socket and request as a parameter and returns the response
 def send_http_request(sock, request):
     sock.sendall(request)
     response = sock.recv(_BUFF_SIZE)
@@ -66,12 +70,14 @@ def send_http_request(sock, request):
         response = sock.recv(_BUFF_SIZE)
         r += response
         
-    return r.decode()
+    return r.decode()  # need to decode the byte array to string
         
+# Parses the response code from the response header
 def response_code(response):
     response = response.split(' ')
     return response[1]
 
+# Parses the redirection location from the response header in case of 301 or 302
 def locate(response):
     response = response.split('\n')
     location = ''
@@ -82,6 +88,7 @@ def locate(response):
     
     return location
 
+# Follows the redirection by connecting to the parsed resource
 def redirection(location):
     global https
     location = location.strip().strip('/')
@@ -89,8 +96,7 @@ def redirection(location):
     if location[:8] == 'https://':
         location = location[8:]
         https = 'yes'
-
-    if location[:7] == 'http://':
+    elif location[:7] == 'http://':
         location = location[7:]
         https = 'no'
         
@@ -115,12 +121,14 @@ def redirection(location):
                  )
             exit(1)
         
-    request = str.encode("HEAD / HTTP/1.0\r\nHost: {}\r\nConnection: close\r\n\r\n".format(location))
+    request = str.encode("HEAD / HTTP/1.0\r\nHost: {}\r\nConnection: close\r\n\r\n".format(location))  # encode string to byte array
     sock.sendall(request)
     response = sock.recv(_BUFF_SIZE)
     sock.close
-    return response.decode()
+    return response.decode()  # need to decode the byte array to string
 
+# Returns the index of the response within the "response" list that should be used
+# If the response is 404 or 505, then error is reported and program exits
 def response_ok(response):
     global https
     
@@ -143,6 +151,7 @@ def response_ok(response):
         print("505 Error, HTTP version not supported")
         exit(1)
         
+# Parses cookie information from header and prints everything specified by assignment
 def parse_and_format(response, host):
     global http_version, https
 
@@ -172,11 +181,9 @@ def parse_and_format(response, host):
 
         print("name: {}, key: {}, domain name: {}".format(name, key, domain))
 
-'''############################################################################################################
-The next THREE functions were taken from: https://python-hyper.org/projects/h2/en/stable/negotiating-http2.html
-The purpose is to determine if the server supports HTTP2
-Comments have been removed to make functions smaller, but can be recovered by following the above link
-############################################################################################################'''
+# The next THREE functions were taken from: https://python-hyper.org/projects/h2/en/stable/negotiating-http2.html
+# The purpose is to determine if the server supports HTTP2
+# Comments have been removed to make functions smaller, but can be recovered by following the above link
 def establish_tcp_connection(host):
     return socket.create_connection((host, 443))
 
