@@ -1,7 +1,7 @@
 import socket
 import ssl
 import sys
-import h2.connection
+# import h2.connection
 
 
 _BUFF_SIZE = 10000
@@ -25,9 +25,11 @@ class smart_web_client(object):
         request = str.encode("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(self.host))  # encode string to byte array
         
         response = []  # the responses are stored in a list
+        
         response.append(send_http_request(self.ss, request))
         response.append(send_http_request(self.s, request))
         
+        # print(response[0])
         # response_ok returns the index of the chosen reponse.. Python evaluates right to left
         return response[response_ok(response)]
     
@@ -92,7 +94,7 @@ def locate(response):
 def redirection(location):
     global https
     location = location.strip().strip('/')
-    
+    print(location) 
     if location[:8] == 'https://':
         location = location[8:]
         https = 'yes'
@@ -142,7 +144,7 @@ def response_ok(response):
         response.append(redirection(locate(response[0])))
         return 2
     elif response_code(response[1]) in '301 302':
-        response.append(redirection(locate(response[0])))
+        response.append(redirection(locate(response[1])))
         return 2
     elif response_code(response[0]) in '404' or response_code(response[1]) in '404':
         print("404 Error, client was able to communicate with server, but resource was not located")
@@ -231,10 +233,10 @@ def main():
 
     host = sys.argv[1]
     
-    try:
-        check_http2(host)
-    except:
-        print('http2 not supported')
+  #  try:
+  #      check_http2(host)
+  #  except:
+  #      print('http2 not supported')
     
     client = smart_web_client(host)
 
