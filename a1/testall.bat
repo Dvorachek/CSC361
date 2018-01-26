@@ -1,0 +1,10 @@
+python SmartClient.py www.cbc.ca
+python SmartClient.py www.uvic.ca
+python SmartClient.py www.google.ca
+python SmartClient.py www.mcgill.ca
+python SmartClient.py www.youtube.com
+python SmartClient.py www.akamai.com
+python SmartClient.py www2.gov.bc.ca
+python SmartClient.py www.python.org
+python SmartClient.py www.aircanada.com
+python SmartClient.py www.bbc.com

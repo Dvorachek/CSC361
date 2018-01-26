@@ -23,42 +23,37 @@ class smart_web_client(object):
     
     def send_request(self):
         request = str.encode("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(self.host))  # encode string to byte array
-        
+
         response = []  # the responses are stored in a list
         response.append(send_http_request(self.ss, request))
         response.append(send_http_request(self.s, request))
-        
+
         # response_ok returns the index of the chosen reponse.. Python evaluates right to left
         return response[response_ok(response)]
     
     def disconnect(self):  # Fairly straight forward
-        try:
-            self.s.close
-        except:
-            print('no http connection to disconnect')
-        
-        try:
-            self.ss.close
-        except:
-            print('no https connection to disconnect')
+        self.s.close
+        self.ss.close
     
     # Sets timeouts and connects to both http and https
     def __connect(self):
         self.s.settimeout(10)
         self.ss.settimeout(10)
+
         try:
             self.s.connect((self.host, self.port))
         except:
-            print('http failed')
+            print('http failed to connect to {}'.format(self.host))
         
         try:
             self.ss.connect((self.host, self.secure_port))
         except:
-            print('https failed')
+            print('https failed to connect to {}'.format(self.host))
     
     # SSL wraps the secure socket for https
     def __set_https(self):
-        self.ss = ssl.wrap_socket(self.ss, keyfile=None, certfile=None, server_side=False, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_SSLv23)
+        self.ss = ssl.wrap_socket(self.ss, keyfile=None, certfile=None, server_side=False,
+                                  cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_SSLv23)
 
 # Takes a socket and request as a parameter and returns the response
 def send_http_request(sock, request):
@@ -100,28 +95,26 @@ def redirection(location):
         location = location[7:]
         https = 'no'
         
+    host, page = location.split('/', 1)
+        
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(10)
     
     if https == 'yes':
+        sock = ssl.wrap_socket(sock, keyfile=None, certfile=None, server_side=False,
+                               cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_SSLv23)
         try:
-            sock.connect((location, 443))
-            sock = ssl.wrap_socket(sock, keyfile=None, certfile=None, server_side=False, cert_reqs=ssl.CERT_NONE, ssl_version=ssl.PROTOCOL_SSLv23)
+            sock.connect((host, 443))
         except:
-            print("Failed to resolve host IP and connect to socket.\n" +
-                   "Redirection failed on https at {}. Likely 503 Error.".format(location)
-                 )
-            exit(1)
+            print('https failed to connect to {}'.format(self.host))
     else:
         try:
-            sock.connect((location, 80))
+            sock.connect((host, 80))
         except:
-            print("Failed to resolve host IP and connect to socket.\n" +
-                   "Redirection failed on http at {}. Likely 503 Error.".format(location)
-                 )
-            exit(1)
+            print('http failed to connect to {}'.format(self.host))
         
-    request = str.encode("HEAD / HTTP/1.0\r\nHost: {}\r\nConnection: close\r\n\r\n".format(location))  # encode string to byte array
+    request = str.encode("GET /{} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n".format(page, host))  # encode string to byte array
+
     sock.sendall(request)
     response = sock.recv(_BUFF_SIZE)
     sock.close
@@ -142,7 +135,7 @@ def response_ok(response):
         response.append(redirection(locate(response[0])))
         return 2
     elif response_code(response[1]) in '301 302':
-        response.append(redirection(locate(response[0])))
+        response.append(redirection(locate(response[1])))
         return 2
     elif response_code(response[0]) in '404' or response_code(response[1]) in '404':
         print("404 Error, client was able to communicate with server, but resource was not located")
@@ -214,7 +207,7 @@ def negotiate_tls(tcp_conn, context, host):
     if negotiated_protocol != "h2":
         print("Didn't negotiate HTTP/2!")
     else:
-        http_version = 'HTTP/2'
+        http_version = 'HTTP/2.0'
 
     return tls_conn
 
