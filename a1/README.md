@@ -5,6 +5,6 @@ Sends an HTTP request to a specified host and retrieves HTTP information and coo
 To run the program make sure the h2 library for Python 3 is installed.
 
 Then run Smart Web Client with:
-python SmartClient.py <website>
+python SmartClient.py website
 
-Where <website> is the address which is to be connected
+Where "website" is the address which is to be connected
