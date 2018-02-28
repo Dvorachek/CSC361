@@ -3,11 +3,10 @@ import sys
 import socket
 from struct import *
 import datetime
+from collections import OrderedDict
 
 
-data = {'total': {}}
-l = []
-
+data = OrderedDict()
 def data_init(s_addr, d_addr, s_port, d_port):
     d = {'s_addr': s_addr,
          'd_addr': d_addr,
@@ -16,36 +15,29 @@ def data_init(s_addr, d_addr, s_port, d_port):
          'fin': 0,
          'syn': 0,
          'rst': 0,
-         'ack': 0,
          'packet_out': 0,
          'packet_in': 0,
          'data_out': 0,
          'data_in': 0,
-         'time': [],
-         'complete': False
+         'time': []
         }
     return d
 
-def parse_payload(header, payload, i):
+def parse_payload(header, payload):
     time = header.getts()
-    data_sent = header.getlen()
+    data_sent = header.getlen()  # possibly need to change
 
     # ethernet header = 14, ip header = 20
     
     iph = unpack('!BBHHHBBH4s4s', payload[14:34])
-   # print(iph)
     
     s_addr = socket.inet_ntoa(iph[8])
     d_addr = socket.inet_ntoa(iph[9])
-    
-   # print("s:{} d:{}".format(s_addr, d_addr))
     
     tcphead = payload[34:54]
     tcph = unpack('!HHLLBBHHH', tcphead)
     s_port = tcph[0]
     d_port = tcph[1]
-  #  seqnum = tcph[2]
-  #  acknum = tcph[3]
     tcp_len = tcph[4] >> 4
 
     flags = tcph[5]
@@ -53,9 +45,9 @@ def parse_payload(header, payload, i):
     syn = (flags & 0x02) >> 1
     rst = (flags & 0x04) >> 2
     psh = (flags & 0x08) >> 3
-    ack = (flags & 0x10) >> 4
-    
-    id = s_port + d_port - 80
+
+    # unique identifier for each connection
+    id = ''.join(item for item in sorted([s_addr, d_addr, str(s_port), str(d_port)]))
     
     # create data structure entry
     try:
@@ -67,60 +59,78 @@ def parse_payload(header, payload, i):
     data[id]['fin'] += fin
     data[id]['syn'] += syn
     data[id]['rst'] += rst
-    data[id]['ack'] += ack
-    if data[id]['fin'] and data[id]['syn']:
-        data[id]['complete'] = True  # probably can move to a later portion
-    if s_port == 80:
+
+    if s_port == data[id]['s_port']:
         data[id]['packet_out'] += 1
         data[id]['data_out'] += data_sent
     else:
         data[id]['packet_in'] += 1
         data[id]['data_in'] += data_sent
     data[id]['time'].append(time)
+
+
+def output_results():
+    print("Total number of connections: {}\n".format(len(data)))
     
-    print("Connection {}:".format(i))
-    print("Source Address: {}".format(s_addr))
-    print("Destination Address: {}".format(d_addr))
-    print("Source Port: {}".format(s_port))
-    print("Destination Port: {}".format(d_port))
-    print("Status: S{}F{}  R{}".format(data[id]['syn'], data[id]['fin'], data[id]['rst']))
-    
-    if data[id]['complete']:
-        time = data[id]['time']
-        start_time = time[0][0] + (float(time[0][1])/1000000)
-        end_time = time[-1][0] + (float(time[-1][1])/1000000)
-        duration = end_time - start_time
-        print("Start Time: {}".format(datetime.datetime.fromtimestamp(start_time)))
-        print("End Time: {}".format(datetime.datetime.fromtimestamp(end_time)))
-        print("Duration: {}".format(duration))
-        print(
+    reset_connections = 0
+    complete_connections = 0
+    i = 1
+    for key, v in data.items():
+        print("Connection {}:".format(i))
+        print("Source Address: {}".format(data[key]['s_addr']))
+        print("Destination Address: {}".format(data[key]['d_addr']))
+        print("Source Port: {}".format(data[key]['s_port']))
+        print("Destination Port: {}".format(data[key]['d_port']))
+        print("Status: S{}F{}  R{}".format(data[key]['syn'], data[key]['fin'], data[key]['rst']))
         
-   # l.append(source + dest - 80)
-   # print(tcphead)
-   # print(tcph)
-   # print("Source Port: {}\nDestination Port: {}\nSequence Number: {}\nAcknowledgment: {}\nTCP Length: {}".format(source, dest, seqnum, acknum, tcp_len))
-   # print("fin: {}, syn: {}, rst: {}, psh: {}, ack: {}".format(fin, syn, rst, psh, ack))
-    print("======")
+        reset_connections += data[key]['rst']
+        i += 1
+        
+        if data[key]['fin'] and data[key]['syn']:
+            time = data[key]['time']
+            start_time = time[0][0] + (float(time[0][1])/1000000)
+            end_time = time[-1][0] + (float(time[-1][1])/1000000)
+            duration = end_time - start_time
+            print("Start Time: {}".format(datetime.datetime.fromtimestamp(start_time)))
+            print("End Time: {}".format(datetime.datetime.fromtimestamp(end_time)))
+            print("Duration: {}".format(duration))
+            print("Number of packets sent from Source to Destination: {}".format(data[key]['packet_out']))
+            print("Number of packets sent from Destination to Source: {}".format(data[key]['packet_in']))
+            print("Total number of packets: {}".format(data[key]['packet_out'] + data[key]['packet_in']))
+            print("Number of data bytes sent from Source to Destination: {}".format(data[key]['data_out']))
+            print("Number of data bytes sent from Destination to Source: {}".format(data[key]['data_in']))
+            print("Total number of data bytes: {}".format(data[key]['data_out'] + data[key]['data_in']))
+            complete_connections += 1
+            
+        print('\n')
+    
+    print("Total number of complete TCP connections: {}".format(complete_connections))
+    print("Number of reset TCP connections: {}".format(reset_connections))
+    print("Number of TCP connections that were still open when the trace capture ended: {}\n".format(len(data)-complete_connections))
+    
+    
+
 
 def main(argv):
     try:
         cap = pcapy.open_offline(argv[1])
     except:
         print("Failed to open the specified cap file")
+        exit(1)
         
     (header, payload) = cap.next()
-
-    i = 1
+    
     while header:
-       # print(header.getlen())
-        parse_payload(header, payload, i)
+        parse_payload(header, payload)
         (header, payload) = cap.next()
-        i += 1
+    
+    output_results()    
         
-   # print(data)
 
 
 if __name__=="__main__":
-    print(len(sys.argv))
+    if len(sys.argv) < 2:
+        print("Requires an additional argument specifying a cap file")
+        exit(1)
     main(sys.argv)
 
