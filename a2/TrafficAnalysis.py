@@ -19,7 +19,9 @@ def data_init(s_addr, d_addr, s_port, d_port):
          'packet_in': 0,
          'data_out': 0,
          'data_in': 0,
-         'time': []
+         'time': [],
+         'window_size': [],
+         'RTT': []
         }
     return d
 
@@ -68,7 +70,6 @@ def parse_payload(header, payload):
         data[id]['data_in'] += data_sent
     data[id]['time'].append(time)
 
-
 def output_results():
     print("Total number of connections: {}\n".format(len(data)))
     
@@ -107,8 +108,6 @@ def output_results():
     print("Total number of complete TCP connections: {}".format(complete_connections))
     print("Number of reset TCP connections: {}".format(reset_connections))
     print("Number of TCP connections that were still open when the trace capture ended: {}\n".format(len(data)-complete_connections))
-    
-    
 
 
 def main(argv):
@@ -124,8 +123,7 @@ def main(argv):
         parse_payload(header, payload)
         (header, payload) = cap.next()
     
-    output_results()    
-        
+    output_results()     
 
 
 if __name__=="__main__":
