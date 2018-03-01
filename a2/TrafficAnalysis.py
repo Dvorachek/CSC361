@@ -35,16 +35,22 @@ def parse_payload(header, payload):
     
     iph = unpack('!BBHHHBBH4s4s', payload[14:34])
     
+    print(iph)
+    
+    iph_len = (iph[0] & 0xF) * 4
+    
     s_addr = socket.inet_ntoa(iph[8])
     d_addr = socket.inet_ntoa(iph[9])
     
-    tcphead = payload[34:54]
+    tcphead = payload[iph_len+14:iph_len+34]
     tcph = unpack('!HHLLBBHHH', tcphead)
     s_port = tcph[0]
     d_port = tcph[1]
     tcp_len = tcph[4] >> 4
     
-  #  print(tcph)
+    data_sent = header.getlen() - (14 + iph_len + tcp_len * 4)
+    
+    print(tcph)
 
     flags = tcph[5]
     fin = flags & 0x01
