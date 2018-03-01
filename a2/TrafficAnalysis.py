@@ -44,7 +44,7 @@ def parse_payload(header, payload):
     d_port = tcph[1]
     tcp_len = tcph[4] >> 4
     
-    print(tcph)
+  #  print(tcph)
 
     flags = tcph[5]
     fin = flags & 0x01
@@ -53,7 +53,8 @@ def parse_payload(header, payload):
     psh = (flags & 0x08) >> 3
     
     window = tcph[6]
-    
+    print(window)
+    print(data_sent)
 
     # unique identifier for each connection
     id = ''.join(item for item in sorted([s_addr, d_addr, str(s_port), str(d_port)]))
@@ -71,11 +72,11 @@ def parse_payload(header, payload):
 
     if s_port == data[id]['s_port']:
         data[id]['packet_out'] += 1
-        data[id]['data_out'] += window
+        data[id]['data_out'] += data_sent
         data[id]['time_out'].append(time)
     else:
         data[id]['packet_in'] += 1
-        data[id]['data_in'] += window
+        data[id]['data_in'] += data_sent
         data[id]['time_in'].append(time)
 
     data[id]['time'].append(time)
@@ -89,12 +90,9 @@ def calc_RTT(id):
     if data[id]['RTT']:
         data[id]['RTT'].append(((1 - alpha) * data[id]['RTT'][-1]) + (alpha * (abs(make_time(data[id]['time_in'][-1]) - make_time(data[id]['time_out'][-1])))))
     elif data[id]['time_in'] and data[id]['time_out']:
-        print(data[id]['time_in'])
         data[id]['RTT'].append(abs(make_time(data[id]['time_in'][-1]) - make_time(data[id]['time_out'][-1])))
 
 def make_time(time):
-    print(time)
-    print('here')
     return (time[0] + (float(time[1])/1000000)) * 1000  # RTT in ms
 
 def output_results():
