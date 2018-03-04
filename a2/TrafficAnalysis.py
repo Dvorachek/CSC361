@@ -23,13 +23,13 @@ def data_init(s_addr, d_addr, s_port, d_port):
          'time_in': [],
          'time': [],
          'window': [],
-         'RTT': []
+         'RTT': [],
+         'last_fin_time': 0
         }
     return d
 
 def parse_payload(header, payload):
     time = header.getts()
-    data_sent = header.getlen()  # possibly need to change
 
     # ethernet header = 14, ip header = 20
     
@@ -60,16 +60,16 @@ def parse_payload(header, payload):
     
     window = tcph[6]
  #   print(window)
-    if fin:
-        data_sent = 0
-
+   
     # unique identifier for each connection
     id = ''.join(item for item in sorted([s_addr, d_addr, str(s_port), str(d_port)]))
     
+    if fin:
+        data_sent = 0
+        data[id]['last_fin_time'] = time
+    
     # create data structure entry
-    try:
-        data[id]
-    except:
+    if id not in data:
         data[id] = data_init(s_addr, d_addr, s_port, d_port)
 
     # update data structure
@@ -128,8 +128,9 @@ def output_results():
         # Part B
         if data[key]['fin'] and data[key]['syn']:
             time = data[key]['time']
+            e_time = data[key]['last_fin_time']
             start_time = time[0][0] + (float(time[0][1])/1000000)
-            end_time = time[-1][0] + (float(time[-1][1])/1000000)
+            end_time = e_time[0] + (float(e_time[1])/1000000)
             duration = end_time - start_time
             print("Start Time: {}".format(datetime.datetime.fromtimestamp(start_time)))
             print("End Time: {}".format(datetime.datetime.fromtimestamp(end_time)))
