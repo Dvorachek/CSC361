@@ -6,7 +6,12 @@ import datetime
 from collections import OrderedDict
 
 
+# Holds and organizes packet data
 data = OrderedDict()
+
+# Function which takes in source/destination IPs and Ports
+# and initalizes a dictionary with them. This is then added
+# to 'data' as a value with a unique key.
 def data_init(s_addr, d_addr, s_port, d_port):
     d = {'s_addr': s_addr,
          'd_addr': d_addr,
@@ -28,6 +33,9 @@ def data_init(s_addr, d_addr, s_port, d_port):
         }
     return d
 
+# Reads in packet header/payload and parses information into the 
+# ordered dictionary 'data'.
+# At the end the calculate RTT function is called.
 def parse_payload(header, payload):
     time = header.getts()
 
@@ -91,6 +99,8 @@ def parse_payload(header, payload):
     
     calc_RTT(id)  # in ms
 
+# Appends a new RTT value from the latest
+# Uses an alpha of 0.25
 def calc_RTT(id):
     alpha = 0.25
     
