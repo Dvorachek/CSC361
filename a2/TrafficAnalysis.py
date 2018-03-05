@@ -1,3 +1,7 @@
+# Dylan Dvorachek
+# V00863468
+# CSC 361 A2
+
 import pcapy
 import sys
 import socket
@@ -40,11 +44,8 @@ def parse_payload(header, payload):
     time = header.getts()
 
     # ethernet header = 14, ip header = 20
-    
     iph = unpack('!BBHHHBBH4s4s', payload[14:34])
-    
-#    print(iph)
-    
+
     iph_len = (iph[0] & 0xF) * 4
     
     s_addr = socket.inet_ntoa(iph[8])
@@ -58,8 +59,6 @@ def parse_payload(header, payload):
     
     data_sent = header.getlen() - (14 + iph_len + tcp_len * 4)
     
- #   print(tcph)
-
     flags = tcph[5]
     fin = flags & 0x01
     syn = (flags & 0x02) >> 1
@@ -67,8 +66,7 @@ def parse_payload(header, payload):
     psh = (flags & 0x08) >> 3
     
     window = tcph[6]
- #   print(window)
-   
+
     # unique identifier for each connection
     id = ''.join(item for item in sorted([s_addr, d_addr, str(s_port), str(d_port)]))
     
@@ -109,9 +107,11 @@ def calc_RTT(id):
     elif data[id]['time_in'] and data[id]['time_out']:
         data[id]['RTT'].append(abs(make_time(data[id]['time_in'][-1]) - make_time(data[id]['time_out'][-1])))
 
+# Helper method for converting (second, millisecond) tuple into seconds.
 def make_time(time):
     return (time[0] + (float(time[1])/1000000)) * 1000  # RTT in ms
 
+# Formats and prints output from OrderedDict 'data'
 def output_results():
     print("Total number of connections: {}\n".format(len(data)))
     
