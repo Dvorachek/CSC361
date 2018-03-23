@@ -14,6 +14,8 @@ data = OrderedDict()
 def parse_payload(header, payload):
     time = header.getts()
     
+    eth_len = 14
+    
     iph = unpack('!BBHHHBBH4s4s', payload[14:34])
     
     iph_len = (iph[0] & 0xF) * 4
@@ -26,6 +28,12 @@ def parse_payload(header, payload):
     
     if protocol == 1:
         print("ICMP")
+        icmph_len = 4
+        icmp_header = payload[iph_len+eth_len:iph_len+eth_len+icmph_len]
+        
+        icmph = unpack('!BBH', icmp_header)
+        print(icmph)
+        
         
     
 #    tcphead = payload[iph_len+14:iph_len+34]
