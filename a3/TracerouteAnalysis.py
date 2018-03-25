@@ -65,8 +65,6 @@ def parse_payload(header, payload):
         icmp_type = icmph[0]
         code = icmph[1]
         checksum = icmph[2]
-        
-        print(icmph)
 
         if icmp_type == 0:
             # windows reply from ult dest
@@ -136,7 +134,6 @@ def parse_payload(header, payload):
 
            
     elif protocol == 17:
-        protocols.add("17: UDP")
         used = iph_len + eth_len
         udph_len = 8
         udp_header = payload[used:used+udph_len]
@@ -148,6 +145,8 @@ def parse_payload(header, payload):
         
         # filter unwanted UDP
         if (d_port>=33434) and (d_port<=33529):
+            protocols.add("17: UDP")
+            
             if not source_addr:
                 source_addr = s_addr
             if not ult_dest_addr:
@@ -176,7 +175,7 @@ def calc_RTT(key):
 
 def calc_STD(RTT):
     # assuming a large beta to lower the weight of the initial std value
-    beta = 0.75
+    beta = 0.5
     
     # first RTT
     r1 = RTT[0]
@@ -188,7 +187,6 @@ def calc_STD(RTT):
         STD = (1-beta)*STD+(beta*(abs(r1-r)))
         
     return STD
-
 
 def output_format():
     print("The IP address of the source node: {}".format(source_addr))
@@ -227,8 +225,6 @@ def output_format():
     for item in RTT_form:
         s, d, RTT, STD = item
         print("The avg RTT between {} and {} is: {:.2f} ms, the s.d. is: {:.2f} ms".format(s, d, RTT, STD))
-        
-   # print(data)
 
 
 def main(argv):
@@ -252,3 +248,4 @@ if __name__=="__main__":
         print("Requires an additional argument specifying a cap file")
         exit(1)
     main(sys.argv)
+
