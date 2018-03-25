@@ -199,10 +199,19 @@ def output_format():
     for item in protocols:
         print("\t{}".format(item))
     
+    s = set()
+    count = 1
     for key, v in data.items():
-        print("\nThe number of fragments created from the original datagram is: {}".format(v['frag_count']))
-        print("The offset of the last fragment is: {}\n".format(v['off_set']))
-        break
+        item = (v['frag_count'], v['off_set'])
+        if item[0] or item[1]:
+            print("\nThe number of fragments created from the original datagram D{} is: {}".format(count, v['frag_count']))
+            print("The offset of the last fragment is: {}\n".format(v['off_set']))
+            s.add(item)
+            count += 1
+    if not s:
+        print("\nThe number of fragments created from the original datagram is: 0")
+        print("The offset of the last fragment is: 0\n")
+        
     
     join_RTT = OrderedDict()
     for key, v in data.items():
