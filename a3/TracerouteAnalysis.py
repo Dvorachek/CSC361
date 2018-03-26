@@ -9,7 +9,6 @@ from struct import *
 from collections import OrderedDict
 
 data = OrderedDict()
-addresses = []
 protocols = set()
 source_addr = False
 ult_dest_addr = False
@@ -115,10 +114,6 @@ def parse_payload(header, payload):
             get_port = payload[port_off:port_off+2]
             port = unpack('!H', get_port)
 
-            # add router to the list of intermediate destination nodes
-            if s_addr not in addresses:
-                addresses.append(s_addr)
-                
             # get key to match ping
             if seq[0] in data:
                 key = seq[0]
@@ -145,11 +140,6 @@ def parse_payload(header, payload):
         # filter unwanted UDP
         if (d_port>=33434) and (d_port<=33529):
             protocols.add("17: UDP")
-            
-            if not source_addr:
-                source_addr = s_addr
-            if not ult_dest_addr:
-                ult_dest_addr = d_addr
 
             # init dict value
             if d_port not in data:
@@ -210,8 +200,11 @@ def format_RTT():
 def output_format():
     print("The IP address of the source node: {}".format(source_addr))
     print("The IP address of ultimate destination node: {}".format(ult_dest_addr))
+    
+    addrs = []
+    [addrs.append(v['router']) for key, v in data.items() if v['router'] not in addrs]
     print("The IP addresses of the intermediate destination nodes:")
-    for item in list(enumerate(addresses, start=1)):
+    for item in list(enumerate(addrs[:-1], start=1)):
         print("\tRouter {}: {}".format(item[0], item[1]))
         
     print("\nThe values in the protocol field of IP headers:")
@@ -237,18 +230,12 @@ def output_format():
 
 
 def main(argv):
-
-
-
-
-
-
     try:
         cap = pcapy.open_offline(argv[1])
     except:
         print("Failed to open the specified cap file")
         exit(1)
-        
+    
     header, payload = cap.next()
     
     while header:
