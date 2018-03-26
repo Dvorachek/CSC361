@@ -1,4 +1,4 @@
-# CSC361 Assignment #2: TCP Traffic Analysis
+# CSC361 Assignment #3: Traceroute Analysis
 ## INTRO:
 Analyzes packets captured from running the program traceroute on Linux and Windows.
 ## RUNNING THE PROGRAM:
