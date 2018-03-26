@@ -6,7 +6,6 @@ import pcapy
 import sys
 import socket
 from struct import *
-import datetime
 from collections import OrderedDict
 
 data = OrderedDict()
@@ -28,10 +27,10 @@ def data_init():
     
 def check_more_fragments(flag_offset, key):
     if flag_offset:
-        re = (flag_offset & 0b1000000000000000) >> 15
-        df = (flag_offset & 0b0100000000000000) >> 14
-        mf = (flag_offset & 0b0010000000000000) >> 13
-        frag_off = (flag_offset & 0b0001111111111111)
+        re = (flag_offset & 0x8000) >> 15
+        df = (flag_offset & 0x4000) >> 14
+        mf = (flag_offset & 0x2000) >> 13
+        frag_off = flag_offset & 0x1FFF
         
         if mf:
             data[key]['frag_count'] += 1
@@ -74,6 +73,9 @@ def parse_payload(header, payload):
             data[key]['router'] = str(s_addr)
             
             calc_RTT(key)
+            
+            source_addr = d_addr
+            ult_dest_addr = s_addr
         
         elif icmp_type == 3:
             # linux reply from ult dest
@@ -86,14 +88,11 @@ def parse_payload(header, payload):
             data[key]['router'] = str(s_addr)
             
             calc_RTT(key)
+            
+            source_addr = d_addr
+            ult_dest_addr = s_addr
 
         elif icmp_type == 8:
-
-            if not source_addr:
-                source_addr = s_addr
-                
-            if not ult_dest_addr:
-                ult_dest_addr = d_addr
                 
             seq = icmph[4]
             if seq not in data:
@@ -174,7 +173,6 @@ def calc_RTT(key):
         data[key]['RTT'].append(abs(make_time(data[key]['time_in'][-1]) - make_time(data[key]['time_out'][-1])))
 
 def calc_STD(RTT):
-    # assuming a large beta to lower the weight of the initial std value
     beta = 0.5
     
     # first RTT
@@ -188,6 +186,27 @@ def calc_STD(RTT):
         
     return STD
 
+def format_RTT():
+    join_RTT = OrderedDict()
+    for key, v in data.items():
+        ip = v['router']
+        if not ip:
+            continue
+        if ip not in join_RTT:
+            join_RTT[ip] = v['RTT']
+        else:
+            join_RTT[ip].append(v['RTT'][0])
+    
+    RTT_form = []
+    for key, v in join_RTT.items():
+        s = source_addr
+        d = key
+        RTT = sum(v)/len(v)
+        STD = calc_STD(v)
+        RTT_form.append((s, d, RTT, STD))
+        
+    return RTT_form
+    
 def output_format():
     print("The IP address of the source node: {}".format(source_addr))
     print("The IP address of ultimate destination node: {}".format(ult_dest_addr))
@@ -212,31 +231,18 @@ def output_format():
         print("\nThe number of fragments created from the original datagram is: 0")
         print("The offset of the last fragment is: 0\n")
         
-    
-    join_RTT = OrderedDict()
-    for key, v in data.items():
-        ip = v['router']
-        if not ip:
-            continue
-        if ip not in join_RTT:
-            join_RTT[ip] = v['RTT']
-        else:
-            join_RTT[ip].append(v['RTT'][0])
-    
-    RTT_form = []
-    for key, v in join_RTT.items():
-        s = source_addr
-        d = key
-        RTT = sum(v)/len(v)
-        STD = calc_STD(v)
-        RTT_form.append((s, d, RTT, STD))
-        
-    for item in RTT_form:
+    for item in format_RTT():
         s, d, RTT, STD = item
         print("The avg RTT between {} and {} is: {:.2f} ms, the s.d. is: {:.2f} ms".format(s, d, RTT, STD))
 
 
 def main(argv):
+
+
+
+
+
+
     try:
         cap = pcapy.open_offline(argv[1])
     except:
