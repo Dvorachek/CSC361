@@ -173,6 +173,7 @@ def calc_STD(RTT):
     
     for r in RTT[1:]:
         STD = (1-beta)*STD+(beta*(abs(r1-r)))
+        r1 = r
         
     return STD
 
