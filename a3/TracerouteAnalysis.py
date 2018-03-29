@@ -205,7 +205,7 @@ def output_format():
     addrs = []
     [addrs.append(v['router']) for key, v in data.items() if v['router'] not in addrs and v['router'] != ult_dest_addr]
     print("The IP addresses of the intermediate destination nodes:")
-    for item in list(enumerate(addrs[:-1], start=1)):
+    for item in list(enumerate(addrs, start=1)):
         print("\tRouter {}: {}".format(item[0], item[1]))
         
     print("\nThe values in the protocol field of IP headers:")
