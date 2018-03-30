@@ -8,6 +8,7 @@ import socket
 from struct import *
 from collections import OrderedDict
 
+# Holds parsed information
 data = OrderedDict()
 identification = OrderedDict()
 protocols = set()
@@ -15,6 +16,8 @@ source_addr = False
 ult_dest_addr = False
 
 
+# Function which is used to initalize the values for
+# individual keys in 'data'
 def data_init():
     d = {'router': '',
          'time_out': [],
@@ -25,6 +28,8 @@ def data_init():
     
     return d
     
+# helper fuction which checks the more fragment flag
+# and the final offset
 def check_more_fragments(flag_offset, key):
     if flag_offset:
         re = (flag_offset & 0x8000) >> 15
@@ -35,17 +40,18 @@ def check_more_fragments(flag_offset, key):
         if mf:
             data[key]['frag_count'] += 1
         elif not mf and data[key]['frag_count'] > 0:
+            data[key]['frag_count'] += 1
             data[key]['off_set'] = frag_off
 
-
+# Reads in packet header/payload and parses information into the
+# ordered dictionary 'data' depending on the protocol type.
 def parse_payload(header, payload):
     global source_addr, ult_dest_addr
     
     time = header.getts()
 
     eth_len = 14
-    
-    iph = unpack('!BBHHHBBH4s4s', payload[14:34])
+    iph = unpack('!BBHHHBBH4s4s', payload[eth_len:eth_len+20])
     
     iph_len = (iph[0] & 0xF) * 4
     ttl = iph[5]
@@ -99,6 +105,7 @@ def parse_payload(header, payload):
             if seq not in data:
                 data[seq] = data_init()
             
+            # Used if the data is fragmented
             if iph[3] in identification:
                 seq = identification[iph[3]]
             
@@ -144,6 +151,7 @@ def parse_payload(header, payload):
         s_port = udph[0]
         d_port = udph[1]
         
+        # used if the message is fragmented
         if iph[3] in identification:
             d_port = identification[iph[3]]
             
@@ -162,9 +170,11 @@ def parse_payload(header, payload):
             # do stuff with data times
             data[d_port]['time_out'].append(time)
 
+# Helper function for converting (second, millisecond) tuple into seconds.
 def make_time(time):
     return (time[0] + (float(time[1])/1000000)) * 1000
 
+# Appends a new RTT value from the latest response.
 def calc_RTT(key):
     alpha = 0.25
     
@@ -173,6 +183,7 @@ def calc_RTT(key):
     elif data[key]['time_in'] and data[key]['time_out']:
         data[key]['RTT'].append(abs(make_time(data[key]['time_in'][-1]) - make_time(data[key]['time_out'][-1])))
 
+# Returns the STD from a list of RTTs
 def calc_STD(RTT):
     beta = 0.5
     
@@ -188,6 +199,8 @@ def calc_STD(RTT):
         
     return STD
 
+# Helper function for 'output_format'
+# Formats RTT values from the 'data' dict.
 def format_RTT():
     join_RTT = OrderedDict()
     for key, v in data.items():
@@ -209,6 +222,7 @@ def format_RTT():
         
     return RTT_form
     
+# Formats and prints output from OrderedDict 'data'.
 def output_format():
     print("The IP address of the source node: {}".format(source_addr))
     print("The IP address of ultimate destination node: {}".format(ult_dest_addr))
