@@ -9,6 +9,7 @@ from struct import *
 from collections import OrderedDict
 
 data = OrderedDict()
+identification = OrderedDict()
 protocols = set()
 source_addr = False
 ult_dest_addr = False
@@ -29,12 +30,13 @@ def check_more_fragments(flag_offset, key):
         re = (flag_offset & 0x8000) >> 15
         df = (flag_offset & 0x4000) >> 14
         mf = (flag_offset & 0x2000) >> 13
-        frag_off = flag_offset & 0x1FFF
-        
+        frag_off = flag_offset
+
         if mf:
             data[key]['frag_count'] += 1
-        elif not mf and data[key]['frag_count']:
-            data[key]['offset'] = frag_off
+        elif not mf and data[key]['frag_count'] > 0:
+            data[key]['off_set'] = frag_off
+
 
 def parse_payload(header, payload):
     global source_addr, ult_dest_addr
@@ -97,6 +99,11 @@ def parse_payload(header, payload):
             if seq not in data:
                 data[seq] = data_init()
             
+            if iph[3] in identification:
+                seq = identification[iph[3]]
+            
+            identification[iph[3]] = seq
+            
             # check for fragments
             check_more_fragments(iph[4], seq)
             
@@ -131,16 +138,20 @@ def parse_payload(header, payload):
         used = iph_len + eth_len
         udph_len = 8
         udp_header = payload[used:used+udph_len]
-        
+
         udph = unpack('!HHHH', udp_header)
-        
+
         s_port = udph[0]
         d_port = udph[1]
         
+        if iph[3] in identification:
+            d_port = identification[iph[3]]
+            
         # filter unwanted UDP
         if (d_port>=33434) and (d_port<=33529):
-            protocols.add("17: UDP")
-
+            protocols.add('17: UDP')
+            identification[iph[3]] = d_port
+            
             # init dict value
             if d_port not in data:
                 data[d_port] = data_init()
@@ -203,7 +214,7 @@ def output_format():
     print("The IP address of ultimate destination node: {}".format(ult_dest_addr))
     
     addrs = []
-    [addrs.append(v['router']) for key, v in data.items() if v['router'] not in addrs and v['router'] != ult_dest_addr]
+    [addrs.append(v['router']) for key, v in data.items() if v['router'] not in addrs and v['router'] != ult_dest_addr and v['router']]
     print("The IP addresses of the intermediate destination nodes:")
     for item in list(enumerate(addrs, start=1)):
         print("\tRouter {}: {}".format(item[0], item[1]))
