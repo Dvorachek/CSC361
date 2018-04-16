@@ -70,13 +70,13 @@ def parse_payload(header, payload):
     # unique identifier for each connection
     id = ''.join(item for item in sorted([s_addr, d_addr, str(s_port), str(d_port)]))
     
-    if fin:
-        data_sent = 0
-        data[id]['last_fin_time'] = time
-    
     # create data structure entry
     if id not in data:
         data[id] = data_init(s_addr, d_addr, s_port, d_port)
+        
+    if fin:
+        data_sent = 0
+        data[id]['last_fin_time'] = time
 
     # update data structure
     data[id]['fin'] += fin
